@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Approve Delivery</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 40px;
+            text-align: center;
+        }
+        .container {
+            max-width: 800px;
+            margin: auto;
+            background: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        h2 {
+            color: #25D366;
+        }
+        button {
+            padding: 12px 24px;
+            background-color: #25D366;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            border-radius: 4px;
+            margin-top: 20px;
+        }
+        button:hover {
+            background-color: #128C7E;
+        }
+        #status {
+            color: green;
+            margin-top: 20px;
+        }
+        .note {
+            font-size: 14px;
+            color: #555;
+            margin-top: 10px;
+        }
+        #invoicePreview {
+            margin-top: 20px;
+            text-align: center;
+        }
+        #invoicePreview img, #invoicePreview iframe {
+            max-width: 100%;
+            height: auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Approve Delivery</h2>
+        <div id="invoicePreview">
+            <p>Loading invoice preview...</p>
+        </div>
+        <p>Please click the button below to approve the delivery. Your current location will be captured as proof.</p>
+        <button id="approveBtn">Approve Delivery</button>
+        <p id="status"></p>
+        <p class="note">After clicking "Approve Delivery", manually send the WhatsApp message to the consignee.</p>
+    </div>
+
+    <script>
+        // Function to display the invoice preview
+        function displayInvoicePreview(invoiceURL, fileType) {
+            const preview = document.getElementById('invoicePreview');
+            preview.innerHTML = ''; // Clear previous preview
+
+            if (fileType.startsWith('image/')) {
+                // If the file is an image, display it
+                const img = document.createElement('img');
+                img.src = invoiceURL;
+                img.alt = 'Invoice Preview';
+                preview.appendChild(img);
+            } else if (fileType === 'application/pdf') {
+                // If the file is a PDF, embed it using an iframe
+                const iframe = document.createElement('iframe');
+                iframe.src = invoiceURL;
+                iframe.width = '100%';
+                iframe.height = '600px';
+                iframe.title = 'Invoice Preview';
+                preview.appendChild(iframe);
+            } else {
+                // Unsupported file type
+                preview.innerHTML = '<p>Preview not available for this file type.</p>';
+            }
+        }
+
+        // Function to extract query parameters from URL
+        function getQueryParams() {
+            const params = {};
+            window.location.search.replace(/[?&]+([^=&]+)=([^&]*)/gi, function(str, key, value) {
+                params[key] = decodeURIComponent(value);
+            });
+            return params;
+        }
+
+        // Display the invoice preview on page load
+        window.addEventListener('DOMContentLoaded', function() {
+            const params = getQueryParams();
+            const consignmentId = params['consignmentId'] || 'Unknown';
+            const invoiceURL = params['invoiceURL'] || '';
+
+            if (!invoiceURL) {
+                document.getElementById('invoicePreview').innerHTML = '<p>No invoice URL provided.</p>';
+                return;
+            }
+
+            // Determine file type from URL extension
+            const extension = invoiceURL.split('.').pop().split(/\#|\?/)[0].toLowerCase();
+            let fileType = '';
+            if (['png', 'jpg', 'jpeg', 'gif', 'bmp'].includes(extension)) {
+                fileType = `image/${extension}`;
+            } else if (extension === 'pdf') {
+                fileType = 'application/pdf';
+            } else {
+                fileType = 'unknown';
+            }
+
+            displayInvoicePreview(invoiceURL, fileType);
+        });
+
+        document.getElementById('approveBtn').addEventListener('click', function() {
+            const params = getQueryParams();
+            const consignmentId = params['consignmentId'] || 'Unknown';
+
+            if (!navigator.geolocation) {
+                alert('Geolocation is not supported by your browser.');
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(sendApproval, handleError);
+        });
+
+        function sendApproval(position) {
+            const latitude  = position.coords.latitude;
+            const longitude = position.coords.longitude;
+
+            // Extract consignmentId from URL parameters
+            const params = getQueryParams();
+            const consignmentId = params['consignmentId'] || 'Unknown';
+
+            const fixedConsigneeNumber = '+919100812765'; // Fixed Consignee's WhatsApp number
+
+            // Construct proof message
+            const proofMessage = encodeURIComponent(
+                `Delivery Approved.\nConsignment ID: ${consignmentId}\nLocation: Latitude ${latitude}, Longitude ${longitude}`
+            );
+
+            // Remove '+' and any non-digit characters for the WhatsApp URL
+            const whatsappNumber = fixedConsigneeNumber.replace(/\D/g, '');
+
+            const whatsappURL = `https://wa.me/${whatsappNumber}?text=${proofMessage}`;
+
+            // Open WhatsApp Web with the pre-filled message
+            window.open(whatsappURL, '_blank');
+
+            // Inform the user
+            document.getElementById('status').innerText = 'WhatsApp message generated. Please send it to the consignee.';
+        }
+
+        function handleError() {
+            alert('Unable to retrieve your location.');
+        }
+    </script>
+</body>
+</html>
